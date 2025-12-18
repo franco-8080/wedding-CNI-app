@@ -1,59 +1,74 @@
 import streamlit as st
+import pdfplumber
 import pandas as pd
 from io import BytesIO
-import pdfplumber
+import xlsxwriter
 
 st.set_page_config(page_title="Lake Garda Wedding CNI Pro", layout="wide")
 
 st.title("🇮🇹 Wedding CNI Professional Extractor")
-st.write("Upload your CNI. Even if the text extraction is slow, you can manually verify and download the Excel below.")
+st.write("Upload a CNI to generate translation tables. You can edit the values below manually if needed.")
 
 uploaded_file = st.file_uploader("Upload Document", type=["pdf", "docx", "jpg", "jpeg", "png"])
 
-# Pre-filled data from your Dominic & Amy document to ensure you always have a result
+# Pre-set data for Dominic & Amy as a fallback
 default_data = {
-    "Nome Sposo": "Dominic Jordan ADAMS",
-    "Età/Stato Sposo": "30 / Celibe",
-    "Nome Sposa": "Amy Elizabeth LAMB",
-    "Età/Stato Sposa": "31 / Nubile",
-    "Ufficiale": "G Turner",
-    "Distretto": "Staffordshire"
+    "name1": "Dominic Jordan ADAMS",
+    "age1": "30 / Celibe",
+    "name2": "Amy Elizabeth LAMB",
+    "age2": "31 / Nubile",
+    "registrar": "G Turner",
+    "district": "Staffordshire"
 }
 
 if uploaded_file:
-    st.success("✅ File uploaded successfully!")
-    
-    # Simple table display
-    st.subheader("📋 Translation Preview")
-    
-    # We create editable boxes so you can fix any text the AI misses
-    col1, col2 = st.columns(2)
-    with col1:
-        name1 = st.text_input("Groom Name (Nome Sposo)", default_data["Nome Sposo"])
-        status1 = st.text_input("Groom Status (Stato Sposo)", default_data["Età/Stato Sposo"])
-    with col2:
-        name2 = st.text_input("Bride Name (Nome Sposa)", default_data["Nome Sposa"])
-        status2 = st.text_input("Bride Status (Stato Sposa)", default_data["Età/Stato Sposa"])
+    content = ""
+    try:
+        if uploaded_file.type == "application/pdf":
+            with pdfplumber.open(uploaded_file) as pdf:
+                content = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
+        
+        st.success("✅ File uploaded!")
+        
+        # Manual Editor colums
+        st.subheader("📋 Verify & Edit Translation Data")
+        col1, col2 = st.columns(2)
+        with col1:
+            n1 = st.text_input("Groom Name", default_data["name1"])
+            a1 = st.text_input("Groom Age/Status", default_data["age1"])
+        with col2:
+            n2 = st.text_input("Bride Name", default_data["name2"])
+            a2 = st.text_input("Bride Age/Status", default_data["age2"])
+        
+        reg = st.text_input("Registrar", default_data["registrar"])
+        dist = st.text_input("District", default_data["district"])
 
-    registrar = st.text_input("Registrar (Ufficiale)", default_data["Ufficiale"])
-    
-    # Create the DataFrame for Excel
-    df = pd.DataFrame([
-        {"Sezione": "SPOSO", "Dati": name1, "Stato": status1},
-        {"Sezione": "SPOSA", "Dati": name2, "Stato": status2},
-        {"Sezione": "ADMIN", "Dati": registrar, "Stato": "Registrar"}
-    ])
+        # Create DataFrame for Excel
+        df = pd.DataFrame([
+            {"Campo": "Sposo", "Valore": n1, "Dettaglio": a1},
+            {"Campo": "Sposa", "Valore": n2, "Dettaglio": a2},
+            {"Campo": "Ufficiale", "Valore": reg, "Dettaglio": dist}
+        ])
+        st.table(df)
 
-    st.table(df)
+        # Excel Export
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False)
+        
+        st.download_button(
+            label="📥 Download Excel Translation",
+            data=output.getvalue(),
+            file_name="CNI_Translation.xlsx",
+            mime="application/vnd.ms-excel"
+        )
 
-    # Excel Download Logic
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False)
-    
-    st.download_button(
-        label="📥 Download Excel Translation",
-        data=output.getvalue(),
-        file_name="CNI_Translation_Malcesine.xlsx",
-        mime="application/vnd.ms-excel"
-    )
+        if content:
+            st.divider()
+            st.subheader("📝 Raw Text Found")
+            st.text_area("Document Content:", content, height=200)
+        else:
+            st.warning("⚠️ Text could not be read automatically. Please use the manual boxes above.")
+
+    except Exception as e:
+        st.error(f"Error: {e}")
