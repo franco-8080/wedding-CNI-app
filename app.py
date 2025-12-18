@@ -7,68 +7,67 @@ import xlsxwriter
 st.set_page_config(page_title="Lake Garda Wedding CNI Pro", layout="wide")
 
 st.title("🇮🇹 Wedding CNI Professional Extractor")
-st.write("Upload a CNI to generate translation tables. You can edit the values below manually if needed.")
+st.write("Complete the translation details below for the Lake Garda Town Hall.")
 
-uploaded_file = st.file_uploader("Upload Document", type=["pdf", "docx", "jpg", "jpeg", "png"])
-
-# Pre-set data for Dominic & Amy as a fallback
-default_data = {
-    "name1": "Dominic Jordan ADAMS",
-    "age1": "30 / Celibe",
-    "name2": "Amy Elizabeth LAMB",
-    "age2": "31 / Nubile",
-    "registrar": "G Turner",
-    "district": "Staffordshire"
-}
+uploaded_file = st.file_uploader("Upload CNI Document", type=["pdf", "docx", "jpg", "jpeg", "png"])
 
 if uploaded_file:
-    content = ""
-    try:
-        if uploaded_file.type == "application/pdf":
-            with pdfplumber.open(uploaded_file) as pdf:
-                content = "\n".join([p.extract_text() for p in pdf.pages if p.extract_text()])
-        
-        st.success("✅ File uploaded!")
-        
-        # Manual Editor colums
-        st.subheader("📋 Verify & Edit Translation Data")
-        col1, col2 = st.columns(2)
-        with col1:
-            n1 = st.text_input("Groom Name", default_data["name1"])
-            a1 = st.text_input("Groom Age/Status", default_data["age1"])
-        with col2:
-            n2 = st.text_input("Bride Name", default_data["name2"])
-            a2 = st.text_input("Bride Age/Status", default_data["age2"])
-        
-        reg = st.text_input("Registrar", default_data["registrar"])
-        dist = st.text_input("District", default_data["district"])
+    st.success("✅ File uploaded! Please verify the details for the Excel export.")
+    
+    # Define the 6 columns required by your wedding business template
+    col_names = ["Nome e cognome (1)", "Età (2)", "Stato Civile (3)", "Professione (4)", "Luogo di residenza (5)", "Periodo di residenza (6)"]
+    
+    # Partner 1 Data (Sposo)
+    st.subheader("🤵 Partner 1 (Sposo)")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        n1 = st.text_input("Full Name", "Dominic Jordan ADAMS")
+        e1 = st.text_input("Age", "30")
+    with c2:
+        s1 = st.text_input("Civil Status", "Celibe")
+        p1 = st.text_input("Profession", "Barber")
+    with c3:
+        l1 = st.text_input("Residence", "Stapenhill, UK")
+        t1 = st.text_input("Period", "More than a month")
 
-        # Create DataFrame for Excel
-        df = pd.DataFrame([
-            {"Campo": "Sposo", "Valore": n1, "Dettaglio": a1},
-            {"Campo": "Sposa", "Valore": n2, "Dettaglio": a2},
-            {"Campo": "Ufficiale", "Valore": reg, "Dettaglio": dist}
-        ])
-        st.table(df)
+    # Partner 2 Data (Sposa)
+    st.subheader("👰 Partner 2 (Sposa)")
+    c4, c5, c6 = st.columns(3)
+    with c4:
+        n2 = st.text_input("Full Name ", "Amy Elizabeth LAMB")
+        e2 = st.text_input("Age ", "31")
+    with c5:
+        s2 = st.text_input("Civil Status ", "Nubile")
+        p2 = st.text_input("Profession ", "Showroom Manager")
+    with c6:
+        l2 = st.text_input("Residence ", "Stapenhill, UK")
+        t2 = st.text_input("Period ", "More than a month")
 
-        # Excel Export
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False)
-        
-        st.download_button(
-            label="📥 Download Excel Translation",
-            data=output.getvalue(),
-            file_name="CNI_Translation.xlsx",
-            mime="application/vnd.ms-excel"
-        )
+    # Create the complete DataFrame
+    data = [
+        [n1, e1, s1, p1, l1, t1],
+        [n2, e2, s2, p2, l2, t2]
+    ]
+    df = pd.DataFrame(data, columns=col_names)
+    
+    st.divider()
+    st.subheader("📊 Final Translation Table")
+    st.table(df)
 
-        if content:
-            st.divider()
-            st.subheader("📝 Raw Text Found")
-            st.text_area("Document Content:", content, height=200)
-        else:
-            st.warning("⚠️ Text could not be read automatically. Please use the manual boxes above.")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
+    # Excel Export with formatting
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='CNI_Translation')
+        # Simple formatting to make headers bold
+        workbook  = writer.book
+        worksheet = writer.sheets['CNI_Translation']
+        header_format = workbook.add_format({'bold': True, 'bg_color': '#D7E4BC', 'border': 1})
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            
+    st.download_button(
+        label="📥 Download COMPLETE Excel Translation",
+        data=output.getvalue(),
+        file_name="Wedding_CNI_Complete.xlsx",
+        mime="application/vnd.ms-excel"
+    )
